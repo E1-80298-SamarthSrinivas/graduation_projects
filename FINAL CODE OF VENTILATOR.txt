@@ -1,0 +1,371 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27,20,4);
+
+#include <SoftwareSerial.h>
+SoftwareSerial mySerial(9, 10);
+char msg;
+char call;
+
+
+
+int incomingByte = 0;
+
+const int watermeterPin = 2;
+volatile int  pulse_frequency;
+unsigned int  literperhour;
+unsigned long currentTime, loopTime;
+byte sensorInterrupt = 0;
+
+// Define stepper motor connections and steps per revolution:
+#define dirPin 5
+#define stepPin 4
+#define stepsPerRevolution 350
+#define stepsPerRevolution1 300
+
+int data1r=7;
+int data2rr=8;
+int gsmon=A0;
+int gsmonvalue=0;
+
+int mode=11;
+int c1=A1;
+int c2=A2;
+
+
+
+
+void setup()
+{
+  // Declare pins as output:
+  pinMode(stepPin, OUTPUT);
+  pinMode(dirPin, OUTPUT);
+  pinMode(watermeterPin, INPUT);
+  pinMode(data1r, INPUT_PULLUP);
+pinMode(data2rr, INPUT_PULLUP);
+pinMode(mode, INPUT);
+pinMode(c1, INPUT);
+pinMode(c2, INPUT);
+pinMode(gsmon, INPUT);
+
+int gsmonvalue=0;
+int gsmonva=0;
+int c11=0;
+int c22=0;
+int moderead=0;
+
+  mySerial.begin(9600);   // Setting the baud rate of GSM Module  
+    Serial.begin(9600);
+    delay(100); 
+   attachInterrupt(sensorInterrupt, getFlow, FALLING);                             
+   currentTime = millis();
+   loopTime = currentTime;
+
+                      // initialize the lcd 
+  lcd.init();
+  // Print a message to the LCD.
+    lcd.backlight();
+  lcd.setCursor(6,0);
+  lcd.print("Automated");
+  lcd.setCursor(5,1);
+  lcd.print("Compression");
+  lcd.setCursor(3,2);
+  lcd.print("Mechnaism Using");
+  lcd.setCursor(4,3);
+  lcd.print("Bag Valve Mask ");
+  delay(5000);
+  lcd.clear();
+   
+}
+
+void loop() 
+{
+  
+label:
+
+ int datavalue1= digitalRead(data1r);
+ int datavalue2= digitalRead(data2rr);
+int moderead= digitalRead(mode);
+int c11= digitalRead(c1);
+int c22= digitalRead(c2);
+
+int gsmonval=digitalRead(gsmon);
+
+ 
+
+
+
+
+ 
+Serial.print("data1= ");
+Serial.println(datavalue1);
+Serial.print("data2= ");
+Serial.println(datavalue2);
+Serial.print("mode= ");
+Serial.println(moderead);
+Serial.println(c11);
+
+
+  
+currentTime = millis();
+   if(currentTime >= (loopTime + 500))
+   {
+      loopTime = currentTime;
+      literperhour = (pulse_frequency * 60 / 7.5);
+      //Serial.println(pulse_frequency);
+      pulse_frequency = 0;
+      Serial.print(literperhour);
+      Serial.println(" Liter/hour");
+      
+   }
+ lcd.setCursor(0,2);
+  lcd.print("                    ");
+ lcd.setCursor(0,2);
+  lcd.print("FLOW RATE= ");
+   lcd.setCursor(12,2);
+  lcd.print(literperhour);
+
+
+
+  if((gsmonval==1) && (gsmonvalue==0))
+ {
+gsmonvalue=1;
+lcd.setCursor(0,3);
+  lcd.print("SMS Activated  ");
+ }
+Serial.println(gsmonval);
+Serial.println(gsmonvalue);
+
+ //////////////////////////////////////////////////////////////////////////////////////////////////
+ if(moderead==1)    //////automatic
+ {
+
+  lcd.setCursor(0,0);
+  lcd.print("                    ");
+     lcd.setCursor(0,0);
+  lcd.print("Automatic Mode ");
+
+   
+ 
+
+ if(datavalue1==1)
+  {
+
+    Serial.println("Normal");
+    lcd.setCursor(0,1);
+  lcd.print("                    ");
+     lcd.setCursor(0,1);
+  lcd.print("%SPO2= ");
+   lcd.setCursor(8,1);
+  lcd.print(">85 NORMAL ");
+
+    
+  // Set the spinning direction clockwise:
+  digitalWrite(dirPin, HIGH);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution1; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(1500);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(1500);
+  }
+
+  delay(500);
+
+  // Set the spinning direction counterclockwise:
+  digitalWrite(dirPin, LOW);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(1500);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(1500);
+  }
+
+  delay(500);
+  }
+  else if(datavalue1==0)
+  {
+    if(gsmonvalue==1)
+    {
+     if (mySerial.available()>0)
+    Serial.write(mySerial.read());
+    SendMessage();
+    delay(100);
+    gsmonvalue=0;
+    Serial.println(gsmonvalue);
+     lcd.setCursor(0,3);
+  lcd.print("                    ");
+    lcd.setCursor(0,3);
+  lcd.print(" ALART SMS SENT ");
+    }
+    Serial.println("Ab-Normal");
+     lcd.setCursor(7,1);
+  lcd.print("                    "); 
+    lcd.setCursor(0,1);
+  lcd.print("%SPO2= ");
+   lcd.setCursor(7,1);
+  lcd.print("<85 AB-NORMAL");
+     
+    
+  // Set the spinning direction clockwise:
+  digitalWrite(dirPin, HIGH);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution1; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(900);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(900);
+  }
+
+  delay(400);
+
+  // Set the spinning direction counterclockwise:
+  digitalWrite(dirPin, LOW);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(900);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(900);
+  }
+
+  delay(400);
+  }
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+}
+
+else if(moderead==0)    ////manual
+{
+lcd.setCursor(0,0);
+  lcd.print("                    ");
+  lcd.setCursor(0,1);
+  lcd.print("                    ");
+  lcd.setCursor(0,3);
+  lcd.print("                    ");
+     lcd.setCursor(0,0);
+  lcd.print("Manual Mode ");
+  switch (c11)
+  {
+  case 0:
+    case1speed();
+    break;
+  case 1:
+    case2speed();
+    break;
+  default:
+    break;
+}
+}
+else
+{
+  goto label;
+}
+}
+
+
+
+void case1speed()
+{
+  // Set the spinning direction clockwise:
+  digitalWrite(dirPin, HIGH);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution1; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(2000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(2000);
+  }
+
+  delay(500);
+
+  // Set the spinning direction counterclockwise:
+  digitalWrite(dirPin, LOW);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(1000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(1000);
+  }
+
+  delay(200); 
+}
+
+void case2speed()
+{
+  // Set the spinning direction clockwise:
+  digitalWrite(dirPin, HIGH);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution1; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(1000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(1000);
+  }
+
+  delay(500);
+
+  // Set the spinning direction counterclockwise:
+  digitalWrite(dirPin, LOW);
+
+  // Spin the stepper motor 5 revolutions fast:
+  for (int i = 0; i < 1 * stepsPerRevolution; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(2000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(2000);
+  }
+
+  delay(200); 
+}
+
+
+void getFlow ()
+{ 
+   pulse_frequency++;
+} 
+
+void SendMessage()
+{
+  mySerial.println("AT+CMGF=1");    //Sets the GSM Module in Text Mode
+  delay(250);  // Delay of 1000 milli seconds or 1 second
+  mySerial.println("AT+CMGS=\"+919353488450\"\r"); // Replace x with mobile number
+  delay(250);
+  mySerial.println("Alart:-(B4)LOW Oxygen level");// The SMS text you want to send
+  delay(100);
+   mySerial.println((char)26);// ASCII code of CTRL+Z
+  delay(250);
+}
